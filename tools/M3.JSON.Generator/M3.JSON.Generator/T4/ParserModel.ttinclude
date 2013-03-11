@@ -1,0 +1,91 @@
+﻿<#
+
+    var model = new []
+        {
+            new ParserState ("Error", isDefault:true)     
+            {
+            },
+
+            new ParserState ("InvalidValueError")     
+            {
+            },
+
+            new ParserState ("ParseValue"                               )     
+            {
+                Next        (" "                , "ParseValue"          ),
+                Next        ("\""               , "StringValue"         ),
+                HandOver    ("-0123456789"      , "NumberValue"         ),
+                Next        ("{"                , "ObjectValue"         ),
+                Next        ("["                , "ArrayValue"          ),
+                Next        ("t"                , "TrueValue"           ),
+                Next        ("f"                , "FalseValue"          ),
+                Next        ("n"                , "NullValue"           ),
+                Next        (DefaultCase        , "InvalidValueError"   ),
+            },
+
+            new ParserState ("ObjectValue")     
+            {
+                Next        (" "                , "ObjectValue"         ),
+                Next        ("\""               , "MemberName"          ),
+                Resume      ("}"                                        ),
+                Next        (DefaultCase        , "InvalidValueError"   ),
+            },
+            new ParserState ("MemberName", resumeWith:"MemberSeparatorExpected")     
+            {
+                HandOver    (DefaultCase        , "ParseString"         ),
+            },
+            new ParserState ("MemberSeparatorExpected")     
+            {
+                Next        (" "                , "MemberSeparatorExpected"     ),
+                Next        (","                , "MemberValueExpected"         ),
+                Resume      ("}"                                                ),
+                Next        (DefaultCase        , "InvalidValueError"           ),
+            },
+            new ParserState ("MemberValueExpected", resumeWith:"MemberSeparatorExpected")     
+            {
+                HandOver    (DefaultCase        , "ParseValue"                  ),
+            },
+            new ParserState ("ArrayValue")     
+            {
+                Next        (" "                , "ArrayValue"          ),
+                Resume      ("]"                                        ),
+                HandOver    (DefaultCase        , "ArrayValueExpected"  ),
+            },
+            new ParserState ("ArrayValueExpected", resumeWith:"ArraySeparatorExpected")     
+            {
+                HandOver    (DefaultCase        , "ParseValue"                  ),
+            },
+            new ParserState ("ArraySeparatorExpected")     
+            {
+                Next        (" "                , "ArraySeparatorExpected"      ),
+                Next        (","                , "ArrayValueExpected"          ),
+                Resume      ("]"                                                ),
+                Next        (DefaultCase        , "InvalidValueError"           ),
+            },
+            new ParserState ("ParseString")     
+            {
+                Resume      (DefaultCase                                ),
+            },
+            new ParserState ("StringValue")     
+            {
+                HandOver    (DefaultCase        , "ParseString"         ),
+            },
+            new ParserState ("NumberValue")     
+            {
+                Resume      (DefaultCase                                ),
+            },
+            new ParserState ("TrueValue")     
+            {
+                Resume      (DefaultCase                                ),
+            },
+            new ParserState ("FalseValue")     
+            {
+                Resume      (DefaultCase                                ),
+            },
+            new ParserState ("NullValue")     
+            {
+                Resume      (DefaultCase                                ),
+            },
+        };
+
+#>
