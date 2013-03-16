@@ -10,6 +10,8 @@
 // You must not remove this notice, or any other, from this software.
 // ----------------------------------------------------------------------------------------------
 
+#nowarn "0020"
+
 namespace M3.JSON.Reference
 
 open System
@@ -102,7 +104,7 @@ module JSONParser =
     let p_plainstr      = p_ws (p_between (p_char '"') (p_many p_strchar) (p_char '"') >>? (fun cs -> new string(cs)))
     let p_str           = p_plainstr >>? StringValue       
 
-    let rec p_value     = p_choose  
+    let rec p_value ps  = (p_choose  
                             [
                                 p_null          ;
                                 p_true          ;
@@ -111,7 +113,7 @@ module JSONParser =
                                 p_number        ;
                                 p_array         ;
                                 p_object        ;
-                            ]
+                            ]) ps
     and p_array ps      = (p_ws (
                             p_between (p_char '[') (p_sep p_value (p_char ',')) (p_char ']')
                             ) >>? ArrayValue) ps
@@ -131,40 +133,62 @@ module JSONParser =
                             ] .>> p_eos
 
     let s_token (sb : StringBuilder) (token : string) ((l,r) : Whitespace)    
-                            =   ignore (sb.Append(l).Append(token).Append(r))
+                            =   sb.Append(l).Append(token).Append(r)
                                 ()
+    let s_escape_string s   =   let sb = new StringBuilder ()
+                                sb.Append('"')
+                                for ch in s do
+                                    match ch with 
+                                        |   '"'     ->  sb.Append (@"\""")
+                                        |   '\\'    ->  sb.Append (@"\\")
+                                        |   '\b'    ->  sb.Append (@"\b")
+                                        |   '\f'    ->  sb.Append (@"\f")
+                                        |   '\n'    ->  sb.Append (@"\n")
+                                        |   '\r'    ->  sb.Append (@"\r")
+                                        |   '\t'    ->  sb.Append (@"\t")
+                                        |   _ when ch < char 32 || ch > char 255 -> sb.AppendFormat(@"\u{0:X4}",int ch)
+                                        |   _       ->  sb.Append (ch)
+                                sb.Append('"')
+                                sb.ToString()
+
     let rec s_json_impl (sb : StringBuilder) json 
                             =   match json with
                                 |   NullValue   ws -> s_token sb "null" ws
                                 |   TrueValue   ws -> s_token sb "true" ws
                                 |   FalseValue  ws -> s_token sb "false" ws
                                 |   NumberValue (d, ws) -> s_token sb (d.ToString(CultureInfo.InvariantCulture)) ws
-                                |   StringValue (s, ws) -> s_token sb s ws  // TODO: Escape string properly
-                                |   ObjectValue (ms, ws)->  let mutable is_first = true
+                                |   StringValue (s, ws) -> s_token sb (s_escape_string s) ws  
+                                |   ObjectValue (ms, (l,r))->  
+                                                            let mutable is_first = true
+                                                            sb.Append(l)
                                                             sb.Append('{')
                                                             for ((n,ws'),v) in ms do
                                                                 if is_first then
                                                                     is_first <- false
                                                                 else
-                                                                    ignore (sb.Append(','))
+                                                                    sb.Append(',')
                                                                     ()
-                                                                s_token sb n ws' // TODO: Escape string properly
+                                                                s_token sb (s_escape_string n) ws'                                                                 
                                                                 sb.Append(':')
                                                                 s_json_impl sb v
                                                                 ()
-                                                            ignore (sb.Append('}'))
+                                                            sb.Append('}')
+                                                            sb.Append(r)
                                                             ()
-                                |   ArrayValue (vs, ws)->   let mutable is_first = true
+                                |   ArrayValue (vs, (l,r))->   
+                                                            let mutable is_first = true
+                                                            sb.Append(l)
                                                             sb.Append('[')
                                                             for v in vs do
                                                                 if is_first then
                                                                     is_first <- false
                                                                 else
-                                                                    ignore (sb.Append(','))
+                                                                    sb.Append(',')
                                                                     ()
                                                                 s_json_impl sb v
                                                                 ()
-                                                            ignore (sb.Append(']'))
+                                                            sb.Append(']')
+                                                            sb.Append(r)
                                                             ()
 
                                                                 

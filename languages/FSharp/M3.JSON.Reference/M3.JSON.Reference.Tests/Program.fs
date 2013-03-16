@@ -25,6 +25,10 @@ let main argv =
         let content = File.ReadAllText(json)
         let result = parse p_json content
         match result with
-            |   Success _   ->  printf "Successfully parsed: %s\r\n" json
-            |   _           ->  printf "Failed to parse: %s\r\n" json
+            |   Success (js,_)  ->  let serialize = s_json js
+                                    if serialize = content then
+                                        printf "SUCCESS: Parsed and compared content: %s\r\n" json
+                                    else
+                                        printf "FAILURE: Parsed but failed to compare content: %s\r\n" json
+            |   _               ->  printf "FAILURE: Failed to parse: %s\r\n" json
     0
