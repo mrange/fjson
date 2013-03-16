@@ -89,7 +89,7 @@ module JSONParser =
                             >>? (fun s -> char (Int16.Parse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture)))                                 
     let p_strchar       = p_choose
                             [
-                                p_any_char >>! (p_char '"') ;
+                                p_any_char >>! (p_satisy (fun c -> c = '"' || c = '\\') "dummy") ;
                                 p_string @"\""" >>?? '"'    ;
                                 p_string @"\\"  >>?? '\\'   ;
                                 p_string @"\b"  >>?? '\b'   ;
@@ -121,14 +121,14 @@ module JSONParser =
                           
     and p_object ps     = (p_ws (
                             p_between (p_char '{') (p_sep p_pair (p_char ',')) (p_char '}')
-                            ) >>? ObjectValue) ps
+                            ) >>? ObjectValue ) ps
                              
 
     let p_json          = p_choose
                             [
                                 p_array     ;
                                 p_object    ;
-                            ]
+                            ] .>> p_eos
 
     let s_token (sb : StringBuilder) (token : string) ((l,r) : Whitespace)    
                             =   ignore (sb.Append(l).Append(token).Append(r))

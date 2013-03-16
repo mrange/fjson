@@ -19,5 +19,12 @@ open JSONParser
 
 [<EntryPoint>]
 let main argv = 
-    let r = parse p_number "0332"
+    let jsons = Directory.GetFiles (@"..\..\..\..\..\..\reference-data", "*.json")
+                    |> Array.map Path.GetFullPath
+    for json in jsons do
+        let content = File.ReadAllText(json)
+        let result = parse p_json content
+        match result with
+            |   Success _   ->  printf "Successfully parsed: %s\r\n" json
+            |   _           ->  printf "Failed to parse: %s\r\n" json
     0

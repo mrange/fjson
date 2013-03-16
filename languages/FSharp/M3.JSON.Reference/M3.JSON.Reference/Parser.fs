@@ -48,12 +48,11 @@ module Parser =
         let stop = min (ps.pos + width + (start - (ps.pos - center))) ps.input.Length  
         ps.input.Substring(start, stop - start).Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t")
 
-    let p_debug p           = (fun ps -> 
+    let p_debug            = (fun ps -> 
 //        if System.Diagnostics.Debugger.IsAttached then System.Diagnostics.Debugger.Break ()
         if (is_eos ps) then printf "DEBUG: EOS\r\n"
         else (printf "DEBUG: pos:%d indent:%d %s\r\n" ps.pos ps.indent (current_pos ps))        
-        let r = p ps
-        r
+        Success ((), ps)
         )
 
     let p_eos               = (fun ps -> if is_eos ps then Success((), ps) else Failure("Expected EOS", ps))
