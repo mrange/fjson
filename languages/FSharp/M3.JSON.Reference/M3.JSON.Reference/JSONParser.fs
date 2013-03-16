@@ -129,3 +129,45 @@ module JSONParser =
                                 p_array     ;
                                 p_object    ;
                             ]
+
+    let s_token (sb : StringBuilder) (token : string) ((l,r) : Whitespace)    
+                            =   ignore (sb.Append(l).Append(token).Append(r))
+                                ()
+    let rec s_json_impl (sb : StringBuilder) json 
+                            =   match json with
+                                |   NullValue   ws -> s_token sb "null" ws
+                                |   TrueValue   ws -> s_token sb "true" ws
+                                |   FalseValue  ws -> s_token sb "false" ws
+                                |   NumberValue (d, ws) -> s_token sb (d.ToString(CultureInfo.InvariantCulture)) ws
+                                |   StringValue (s, ws) -> s_token sb s ws  // TODO: Escape string properly
+                                |   ObjectValue (ms, ws)->  let mutable is_first = true
+                                                            sb.Append('{')
+                                                            for ((n,ws'),v) in ms do
+                                                                if is_first then
+                                                                    is_first <- false
+                                                                else
+                                                                    ignore (sb.Append(','))
+                                                                    ()
+                                                                s_token sb n ws' // TODO: Escape string properly
+                                                                sb.Append(':')
+                                                                s_json_impl sb v
+                                                                ()
+                                                            ignore (sb.Append('}'))
+                                                            ()
+                                |   ArrayValue (vs, ws)->   let mutable is_first = true
+                                                            sb.Append('[')
+                                                            for v in vs do
+                                                                if is_first then
+                                                                    is_first <- false
+                                                                else
+                                                                    ignore (sb.Append(','))
+                                                                    ()
+                                                                s_json_impl sb v
+                                                                ()
+                                                            ignore (sb.Append(']'))
+                                                            ()
+
+                                                                
+    let s_json json         =   let sb = new StringBuilder()
+                                s_json_impl sb json
+                                sb.ToString()
