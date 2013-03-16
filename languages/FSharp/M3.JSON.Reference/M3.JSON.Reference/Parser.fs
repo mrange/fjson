@@ -83,6 +83,28 @@ module Parser =
         Success (ps.input.Substring(ps.pos, p - ps.pos), move_to ps p)
         )
 
+    let p_satisy_fixed test fix e = (fun ps ->         
+        let mutable p = ps.pos
+        let ee = fix + ps.pos
+
+        if ee > ps.input.Length then
+            Failure (e, ps)
+        else
+            while (p < ee) && (test (p - ps.pos) ps.input.[p]) do
+                p <- p + 1
+
+            if p = ee then
+                Success (ps.input.Substring(ps.pos, p - ps.pos), move_to ps p)
+            else
+                Failure (e, ps)
+        )
+
+    let p_value (p : Parser<'a>) v = (fun ps ->
+        match p ps with
+            |   Success(_, ps') ->  Success(v, ps')
+            |   Failure(e, _)   ->  Failure(e,ps)
+        )
+
     let p_map (p : Parser<'a>) m = (fun ps ->
         match p ps with
             |   Success(v, ps') ->  Success(m v, ps')
@@ -102,6 +124,34 @@ module Parser =
                         ps'     <- ps''
                     |   _       ->
                         is_looking <- false
+
+            Success (result.ToArray (), ps')
+        )
+
+    let p_sep (p : Parser<'a>) (psep : Parser<'b>)= 
+        (fun ps ->
+            let mutable is_first    = true
+            let mutable is_looking  = true
+            let mutable ps'         = ps
+            let         result      = new ResizeArray<'a> ()
+            while (is_looking) do
+                if is_first then
+                    is_first <- false
+                else
+                    match psep ps' with
+                        |   Success(_,ps'') ->
+                            ps' <- ps''
+                        |   _               ->
+                            is_looking <- false
+
+                if is_looking then                    
+                    let pr = p ps'
+                    match pr with
+                        |   Success (v, ps'')   ->
+                            result.Add(v)
+                            ps'     <- ps''
+                        |   _       ->
+                            is_looking <- false
 
             Success (result.ToArray (), ps')
         )
@@ -163,6 +213,15 @@ module Parser =
             |   Failure (e, _)          ->  Failure (e, ps)
         )
 
+    let (>>)    = p_combine
+    let (.>>)   = p_keep_left
+    let (>>.)   = p_keep_right          
+    let (>>?)   = p_map
+    let (>>??)  = p_value
+    let (>>!)   = p_except
+
+    let p_between (pp : Parser<'a>) (pr : Parser<'b>) (pe : Parser<'c>) = pp >>. pr .>> pe
+
     let p_indent= (fun ps ->
         Success ((), {ps with indent = ps.indent + 1})
         )
@@ -171,14 +230,8 @@ module Parser =
         Success ((), {ps with indent = ps.indent - 1})
         )
 
-    let (>>)    = p_combine
-    let (.>>)   = p_keep_left
-    let (>>.)   = p_keep_right          
-    let (>>?)   = p_map
-    let (>>!)   = p_except
-
     let p_char ch               = (p_satisy (fun c -> c = ch) ("Expected: " + ch.ToString())) >>? (fun ch -> ()) 
-    let p_string (str : string) = (p_satisy_many (fun i c -> (i < str.Length) && (str.[i] = c))) >>? (fun str -> ()) 
+    let p_string (str : string) = (p_satisy_fixed (fun i c -> (i < str.Length) && (str.[i] = c))) str.Length ("Expected:" + str) >>? (fun str -> ()) 
 
     let p_whitespace            = p_satisy Char.IsWhiteSpace "Expected whitespace"
     let p_whitespaces           = p_satisy_many (fun _ c -> Char.IsWhiteSpace(c))
