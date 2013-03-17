@@ -12,51 +12,48 @@
 
 open System
 open System.IO
+open System.Globalization
+
 open M3.JSON.Reference
 
-let write_value_line (output : StreamWriter) (vl: ValueLine) =
-    match vl with 
-        |   EmptyLine   s       -> output.WriteLine("EmptyLine:{0}", s)
-        |   CommentLine (i,s)   -> output.WriteLine("CommentLine:{0},{1}", i, s)
-        |   ContentLine s       -> output.WriteLine("ContentLine:{0}", s)
+open Parser
+open JSONParser
 
-let rec write_member (output : StreamWriter) (m: Member) = 
-    match m with 
-        |   Empty s             ->  output.WriteLine("Empty:{0}", s)
-        |   Comment (i,s)       ->  output.WriteLine("Comment:{0},{1}", i, s)
-        |   Object (name,ms')   ->  output.WriteLine("Object_Begin:{0}", name)
-                                    for m' in ms' do
-                                        write_member output m'
-                                    output.WriteLine("Object_End:{0}", name)
-        |   Value (name, vl')   ->  output.WriteLine("Value_Begin:{0}", name)
-                                    for v' in vl' do
-                                        write_value_line output v'
-                                    output.WriteLine("Value_End:{0}", name)   
-                                        
+let rec write_json (output : StreamWriter) (json : JSON) =
+    match json with
+        |   NullValue (l,r)             ->  output.WriteLine(@"Null: ""{0}"",""{1}""", s_escape_string l, s_escape_string r)
+        |   TrueValue (l,r)             ->  output.WriteLine(@"True: ""{0}"",""{1}""", s_escape_string l, s_escape_string r)
+        |   FalseValue (l,r)            ->  output.WriteLine(@"False: ""{0}"",""{1}""", s_escape_string l, s_escape_string r)
+        |   NumberValue (d,(l,r))       ->  output.WriteLine(@"Number: {0},""{1}"",""{2}""", d.ToString(CultureInfo.InvariantCulture), s_escape_string l, s_escape_string r)
+        |   StringValue (s,(l,r))       ->  output.WriteLine(@"String: {0},""{1}"",""{2}""", s_escape_string s, s_escape_string l, s_escape_string r)
+        |   ArrayValue (vs,(l,r))       ->  output.WriteLine(@"Array_Begin: ""{0}"",""{1}""", s_escape_string l, s_escape_string r)
+                                            for v in vs do
+                                                write_json output v
+                                            output.WriteLine(@"Array_End: ""{0}"",""{1}""", s_escape_string l, s_escape_string r)
+        |   ObjectValue (ms,(l,r))      ->  output.WriteLine(@"Object_Begin: ""{0}"",""{1}""", s_escape_string l, s_escape_string r)
+                                            for ((n,(l',r')),v) in ms do
+                                                output.WriteLine(@"Member_Begin: {0},""{1}"",""{2}""", s_escape_string n, s_escape_string l', s_escape_string r')
+                                                write_json output v
+                                                output.WriteLine(@"Member_End: {0},""{1}"",""{2}""", s_escape_string n, s_escape_string l', s_escape_string r')
+                                            output.WriteLine(@"Object_End: ""{0}"",""{1}""", s_escape_string l, s_escape_string r)
 
-let write_hron (output : StreamWriter) (hron : HRON) =
-    let (pps, ms) = hron 
-    for pp in pps do
-        output.WriteLine("PreProcessor:{0}", pp)
-    for m in ms do
-        write_member output m
-
-let build_action_log (hron : string) (action_log : string)= 
-    let input = File.ReadAllText(hron)
+let build_action_log (json : string) (action_log : string)= 
+    let input = File.ReadAllText(json)
     use output = new StreamWriter(action_log)
-    let result = Parser.parse HRONParser.p_hron input
+    let result = parse p_json input
     match result with
-        |   Success (doc, ps)   -> write_hron output doc
+        |   Success (doc, ps)   -> write_json output doc
         |   Failure (msg, _)    -> failwithf "Parse failure: %s" msg
+
 [<EntryPoint>]
 let main argv = 
-    let hrons = Directory.GetFiles (@"..\..\..\..\..\..\reference-data", "*.hron")
+    let jsons = Directory.GetFiles (@"..\..\..\..\..\..\reference-data", "*.json")
                     |> Array.map Path.GetFullPath
-    for hron in hrons do
-        let action_log = hron + ".actionlog"
-        printfn "Build action log for: %s" hron
+    for json in jsons do
+        let action_log = json + ".actionlog"
+        printfn "Building action log for: %s" json
         try
-            build_action_log hron action_log
+            build_action_log json action_log
         with
             |   exc -> printfn "Failed to build action log: %s" exc.Message
 
