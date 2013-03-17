@@ -94,6 +94,7 @@ module JSONParser =
                                 p_any_char >>! (p_satisy (fun c -> c = '"' || c = '\\') "dummy") ;
                                 p_string @"\""" >>?? '"'    ;
                                 p_string @"\\"  >>?? '\\'   ;
+                                p_string @"\/"  >>?? '/'    ;
                                 p_string @"\b"  >>?? '\b'   ;
                                 p_string @"\f"  >>?? '\f'   ;
                                 p_string @"\n"  >>?? '\n'   ;
@@ -141,6 +142,7 @@ module JSONParser =
                                     match ch with 
                                         |   '"'     ->  sb.Append (@"\""")
                                         |   '\\'    ->  sb.Append (@"\\")
+                                        |   '/'     ->  sb.Append (@"\/")
                                         |   '\b'    ->  sb.Append (@"\b")
                                         |   '\f'    ->  sb.Append (@"\f")
                                         |   '\n'    ->  sb.Append (@"\n")

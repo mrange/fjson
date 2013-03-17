@@ -42,8 +42,8 @@ let build_action_log (json : string) (action_log : string)=
     use output = new StreamWriter(action_log)
     let result = parse p_json input
     match result with
-        |   Success (doc, ps)   -> write_json output doc
-        |   Failure (msg, _)    -> failwithf "Parse failure: %s" msg
+        |   Success (doc, ps)       -> write_json output doc
+        |   Failure (msg, _, ps)    -> failwithf "Parse failure@%d : %s" ps.pos msg
 
 [<EntryPoint>]
 let main argv = 

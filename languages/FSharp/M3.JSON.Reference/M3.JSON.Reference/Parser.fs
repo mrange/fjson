@@ -19,7 +19,7 @@ type ParserState    = {input : string; pos : int; indent : int;}
 
 type ParserResult<'a>  =
     |   Success of 'a*ParserState
-    |   Failure of string*ParserState
+    |   Failure of string*ParserState*ParserState
 
 type Parser<'a>     = ParserState -> ParserResult<'a>
 
@@ -39,28 +39,33 @@ module Parser =
 
     let p_success v         = (fun ps -> Success(v, ps))
     
-    let p_failure v         = (fun ps -> Failure(v, ps))
+    let p_failure v         = (fun ps -> Failure(v, ps, ps))
 
     let current_pos ps      = 
         let center  = 0
-        let width   = 16
+        let width   = 32
         let start = max (ps.pos - center) 0
         let stop = min (ps.pos + width + (start - (ps.pos - center))) ps.input.Length  
         ps.input.Substring(start, stop - start).Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t")
 
-    let p_debug            = (fun ps -> 
+    let p_debug p           = (fun ps -> 
 //        if System.Diagnostics.Debugger.IsAttached then System.Diagnostics.Debugger.Break ()
+        let r = p ps
+        let is_success = 
+            match r with 
+                | Success _ -> "Yes"
+                | _ -> "No"
         if (is_eos ps) then printf "DEBUG: EOS\r\n"
-        else (printf "DEBUG: pos:%d indent:%d %s\r\n" ps.pos ps.indent (current_pos ps))        
-        Success ((), ps)
+        else (printf "DEBUG: success:%s pos:%d indent:%d %s\r\n" is_success ps.pos ps.indent (current_pos ps))        
+        r
         )
 
-    let p_eos               = (fun ps -> if is_eos ps then Success((), ps) else Failure("Expected EOS", ps))
+    let p_eos               = (fun ps -> if is_eos ps then Success((), ps) else Failure("Expected EOS", ps, ps))
 
     let p_any_char      = (fun ps -> 
         if is_not_eos ps
             then Success (ps.input.[ps.pos], advance ps)
-            else Failure ("EOS", ps)
+            else Failure ("EOS", ps, ps)
         )
 
     let p_satisy test e = (fun ps -> 
@@ -68,8 +73,8 @@ module Parser =
             then
                 if (test ps.input.[ps.pos]) 
                     then Success (ps.input.[ps.pos], advance ps)
-                    else Failure (e, ps)
-            else  Failure ("EOS", ps)
+                    else Failure (e, ps, ps)
+            else  Failure ("EOS", ps, ps)
         )
 
     let p_satisy_many test = (fun ps ->         
@@ -87,7 +92,7 @@ module Parser =
         let ee = fix + ps.pos
 
         if ee > ps.input.Length then
-            Failure (e, ps)
+            Failure (e, ps, ps)
         else
             while (p < ee) && (test (p - ps.pos) ps.input.[p]) do
                 p <- p + 1
@@ -95,19 +100,19 @@ module Parser =
             if p = ee then
                 Success (ps.input.Substring(ps.pos, p - ps.pos), move_to ps p)
             else
-                Failure (e, ps)
+                Failure (e, ps, move_to ps p)
         )
 
     let p_value (p : Parser<'a>) v = (fun ps ->
         match p ps with
             |   Success(_, ps') ->  Success(v, ps')
-            |   Failure(e, _)   ->  Failure(e,ps)
+            |   Failure(e, _, ps')->  Failure(e, ps, ps')
         )
 
     let p_map (p : Parser<'a>) m = (fun ps ->
         match p ps with
-            |   Success(v, ps') ->  Success(m v, ps')
-            |   Failure(e, _)   ->  Failure(e,ps)
+            |   Success(v, ps')     ->  Success(m v, ps')
+            |   Failure(e, _, ps')  ->  Failure(e,ps, ps')
         )
 
     let p_many (p : Parser<'a>)  = 
@@ -158,13 +163,13 @@ module Parser =
     let p_opt (p : Parser<'a>)  = (fun ps ->
         match p ps with
             |   Success (v, ps')    ->  Success (Some v, ps')
-            |   Failure (_, _)      ->  Success (None, ps)
+            |   Failure _           ->  Success (None, ps)
         )
         
     let p_except (p : Parser<'a>) (pe : Parser<'b>) = (fun ps ->
         match pe ps with
-            |   Success (_, _)  ->  Failure ("Unexpected", ps)
-            |   Failure (_, _)  ->  p ps
+            |   Success (_, ps')->  Failure ("Unexpected", ps, ps')
+            |   Failure _       ->  p ps
         )
 
     let p_choose (parsers : Parser<'a> list) = 
@@ -184,16 +189,16 @@ module Parser =
 
             match result with
                 |   Some x  -> Success (x, ps')
-                |   _       -> Failure ("No match found", ps)                         
+                |   _       -> Failure ("No match found", ps, ps')                         
         )
 
     let p_combine (pl : Parser<'a>) (pr : Parser<'b>) = (fun ps ->
         match pl ps with
             |   Success (l, ps')    ->  
                 match pr ps' with
-                    |   Success (r, ps'')   ->  Success((l,r), ps'')
-                    |   Failure (e, _)      ->  Failure(e, ps)
-            |   Failure (e, _)      ->  Failure (e, ps)
+                    |   Success (r, ps'')       ->  Success((l,r), ps'')
+                    |   Failure (e, _, ps'')    ->  Failure(e, ps, ps'')
+            |   Failure (e, _, ps'')            ->  Failure (e, ps, ps'')
         )
 
     let p_keep_left (pl : Parser<'a>) (pr : Parser<'b>) = 
@@ -201,7 +206,7 @@ module Parser =
         (fun ps ->
         match combiner ps  with
             |   Success ((l,_), ps')    ->  Success (l, ps')
-            |   Failure (e, _)          ->  Failure (e, ps)
+            |   Failure (e, _, ps')     ->  Failure (e, ps, ps')
         )
 
     let p_keep_right (pl : Parser<'a>) (pr : Parser<'b>) = 
@@ -209,7 +214,7 @@ module Parser =
         (fun ps ->
         match combiner ps  with
             |   Success ((_,r), ps')    ->  Success (r, ps')
-            |   Failure (e, _)          ->  Failure (e, ps)
+            |   Failure (e, _, ps')     ->  Failure (e, ps, ps')
         )
 
     let (>>)    = p_combine
@@ -244,8 +249,8 @@ module Parser =
             |   Success (_, ps')            -> 
                 match p_ln ps' with
                     |   Success (_, ps'')   -> Success ((), ps'')
-                    |   Failure (_, _)      -> Success ((), ps')
-            |   Failure (_, _)              -> p_ln ps        
+                    |   Failure _           -> Success ((), ps')
+            |   Failure _                   -> p_ln ps        
         )
 
     let p_indention = 
@@ -258,7 +263,7 @@ module Parser =
             
             if r 
             then    Success ((), move_to ps (ps.pos + ps.indent))
-            else    Failure("Expected indent", ps)    
+            else    Failure("Expected indent", ps , move_to ps (ps.pos + ps.indent))    
         )     
 
 

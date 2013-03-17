@@ -21,7 +21,7 @@ open JSONParser
 let main argv = 
     let jsons = Directory.GetFiles (@"..\..\..\..\..\..\reference-data", "*.json")
                     |> Array.map Path.GetFullPath
-    for json in jsons do
+    for json in jsons |> Array.filter (fun s -> s.Contains("odata")) do
         let content = File.ReadAllText(json)
         let result = parse p_json content
         match result with
@@ -30,5 +30,5 @@ let main argv =
                                         printf "SUCCESS: Parsed and compared content: %s\r\n" json
                                     else
                                         printf "FAILURE: Parsed but failed to compare content: %s\r\n" json
-            |   _               ->  printf "FAILURE: Failed to parse: %s\r\n" json
+            |   Failure (r, _, ps)  ->  printf "FAILURE: Failed to parse@%d: %s\r\n" ps.pos json
     0
