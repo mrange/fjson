@@ -21,7 +21,7 @@ open JSONParser
 let main argv = 
     let jsons = Directory.GetFiles (@"..\..\..\..\..\..\reference-data", "*.json")
                     |> Array.map Path.GetFullPath
-    for json in jsons |> Array.filter (fun s -> s.Contains("odata")) do
+    for json in jsons |> Array.filter (fun s -> true) do
         let content = File.ReadAllText(json)
         let result = parse p_json content
         match result with

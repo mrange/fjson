@@ -142,7 +142,7 @@ module JSONParser =
                                     match ch with 
                                         |   '"'     ->  sb.Append (@"\""")
                                         |   '\\'    ->  sb.Append (@"\\")
-                                        |   '/'     ->  sb.Append (@"\/")
+                                        |   '/'     ->  sb.Append (@"/")
                                         |   '\b'    ->  sb.Append (@"\b")
                                         |   '\f'    ->  sb.Append (@"\f")
                                         |   '\n'    ->  sb.Append (@"\n")
